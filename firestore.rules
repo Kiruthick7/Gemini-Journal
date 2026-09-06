@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false; // Default deny
+    }
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    match /users/{userId} {
+      // 1. Idempotency Keys (Backend only)
+      match /idempotencyKeys/{keyId} {
+        allow read, write: if false; 
+      }
+
+      // 2. Quotas (Backend only)
+      match /quotas/{quotaId} {
+        allow read, write: if false;
+      }
+
+      // 3. Conversations
+      match /conversations/{conversationId} {
+        // Users can read their own conversations and messages
+        allow read: if isOwner(userId);
+        allow write: if false; // All creation/updates happen via Cloud Run Admin SDK
+
+        match /messages/{messageId} {
+          allow read: if isOwner(userId);
+          allow write: if false;
+        }
+      }
+
+      // 4. Journals
+      match /journals/{journalId} {
+        // Users can read their own journals
+        allow read: if isOwner(userId);
+        allow write: if false; // All creation/updates happen via Cloud Run Admin SDK
+      }
+
+      match /thoughtMap/{docId} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+    }
+  }
+}
